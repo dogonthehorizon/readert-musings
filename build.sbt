@@ -26,7 +26,8 @@ version := "0.0.1"
 libraryDependencies ++= Seq(
   "org.typelevel" %% "cats-core" % "1.6.1",
   "org.typelevel" %% "cats-effect" % "1.3.1",
-  "org.typelevel" %% "cats-mtl-core" % "0.6.0"
+  "org.typelevel" %% "cats-mtl-core" % "0.6.0",
+  "com.lihaoyi" %% "requests" % "0.2.0"
 )
 // Here, `libraryDependencies` is a set of dependencies, and by using `+=`,
 // we're adding the cats dependency to the set of dependencies that sbt will go

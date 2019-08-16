@@ -7,20 +7,51 @@ import cats.mtl.implicits._
 
 object Main extends IOApp {
 
-  final case class Env(print: String => Unit)
-
-  type AppConfig[F[_]] = ApplicativeAsk[F, Env]
-
-  def program[F[_]: Monad: AppConfig]: F[Unit] = for {
-    env <- ApplicativeAsk.ask[F, Env]
-  } yield {
-    env.print("Hello, World!")
+  def run(args: List[String]): IO[ExitCode] = {
+    args.headOption match {
+      case Some(website) =>
+        val env = Env(
+          print = ioPrint,
+          ping = pingWebsite,
+          // TODO you might want to do some validation here
+          websiteToPing = Url(website)
+        )
+        interpreter.run(env).as(ExitCode.Success)
+      case None =>
+        IO(System.err.println("Usage: isUp website")).as(ExitCode.Error)
+    }
   }
+
+  /** Our "main". */
+  def program[F[_]: Monad: LiftIO: AppConfig]: F[Unit] = for {
+    env     <- ApplicativeAsk.ask[F, Env]
+    result  <- env.ping(env.websiteToPing).to[F]
+    _       <- env.print(s"${env.websiteToPing}: $result").to[F]
+  } yield ()
+
+  /** Type alias representing an effectively ReaderT effect. */
+  type AppConfig[F[_]] = ApplicativeAsk[F, Env]
 
   val interpreter = program[ReaderT[IO, Env, ?]]
 
-  def run(args: List[String]): IO[ExitCode] = {
-    val env = Env(print = println)
-    interpreter.run(env).as(ExitCode.Success)
-  }
+  /** Newtype for strings that represent URLs. */
+  final case class Url(value: String) extends AnyVal
+
+  /** The environment our program will use. */
+  final case class Env(
+    print: String => IO[Unit],
+    ping: Url => IO[Int],
+    websiteToPing: Url
+  )
+
+  /** Lift {{requests.get}} into the IO effect. */
+  def pingWebsite(url: Url): IO[Int] =
+    IO(requests.get(url.value).statusCode)
+
+  /** Lift {{println}} into the IO effect. */
+  def ioPrint(s: String): IO[Unit] =
+    IO.pure(s).flatMap(toPrint => {
+      println(toPrint)
+      IO.unit
+    })
 }
